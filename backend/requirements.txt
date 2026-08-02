@@ -1,0 +1,16 @@
+django>=5.2,<5.3
+pillow
+djangorestframework
+drf-spectacular
+djangorestframework-simplejwt
+drf-restwind
+django-unfold
+celery
+django_celery_beat
+django-cors-headers
+django-redis
+python-dotenv
+
+# For deploy in render.com
+whitenoise
+gunicorn

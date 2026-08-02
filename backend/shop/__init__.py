@@ -1,0 +1,1 @@
+from shop.configs.celery_conf import celery_app
