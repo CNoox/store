@@ -43,3 +43,14 @@ def update_last_login_task(pk):
     user = UserModel.objects.get(pk=pk)
     user.last_login = timezone.now()
     user.save(update_fields=['last_login'])
+
+@shared_task()
+def change_password_task(email,password):
+    from .models import UserModel
+    try:
+        user = UserModel.objects.get(email=email)
+        user.set_password(password)
+        user.save(update_fields=['password'])
+        return f'password changed. - for {email}'
+    except UserModel.DoesNotExist:
+        return f'user does not exist. - {email}'
