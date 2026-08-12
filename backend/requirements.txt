@@ -17,3 +17,6 @@ gunicorn
 
 # Database Requirement
 psycopg2
+
+# Email service
+resend

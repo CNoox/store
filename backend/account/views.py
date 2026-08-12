@@ -43,7 +43,6 @@ class LoginEmailOTPView(APIView):
             send_otp(email)
             return Response({'message': 'OTP code is send.'}, status=status.HTTP_200_OK)
         left = send_time + timedelta(seconds=60) - timezone.now()
-        left_type = type(left)
         return Response({'message': 'OTP is already send', 'left_time': left.seconds}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
