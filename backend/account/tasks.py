@@ -48,6 +48,8 @@ def update_last_login_task(pk):
 def change_password_task(email,password):
     from .models import UserModel
     try:
+        email = email[0]
+        password = password[0]
         user = UserModel.objects.get(email=email)
         user.set_password(password)
         user.save(update_fields=['password'])

@@ -4,20 +4,19 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 # Create your models here.
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
+    def _create_user(self, email, password, **extra_fields):
         if not email:
             raise ValueError('Users must have an email address')
         user = self.model(email=self.normalize_email(email), **extra_fields)
         if password:
             user.set_password(password)
+        user.is_active = True
         user.save(using=self._db)
         return user
+    def create_user(self, email, password=None, **extra_fields):
+        return self._create_user(email, password, **extra_fields)
     def create_superuser(self, email, password):
-        user = self.create_user(email, password)
-        user.is_staff = True
-        user.is_superuser = True
-        user.save(using=self._db)
-        return user
+        return self._create_user(email, password, is_staff=True, is_superuser=True)
 
 class UserModel(AbstractBaseUser, PermissionsMixin):
         id = models.AutoField(primary_key=True)

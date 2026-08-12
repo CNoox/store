@@ -1,4 +1,8 @@
-DEPLOY = False
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+DEPLOY = os.environ.get('DEPLOY') == 'True'
 
 MIDDLEWARE_FOR_DEPLOY = []
 
