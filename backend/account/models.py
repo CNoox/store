@@ -23,11 +23,11 @@ class UserModel(AbstractBaseUser, PermissionsMixin):
         email = models.EmailField(max_length=255, unique=True)
         password = models.CharField(max_length=255, blank=True, null=True)
         phone_number = models.CharField(max_length=255, blank=True, null=True)
-        created_at = models.DateTimeField(auto_now=True)
         is_active = models.BooleanField(default=True)
         is_staff = models.BooleanField(default=False)
         is_superuser = models.BooleanField(default=False)
-        last_login = models.DateTimeField(auto_now_add=True)
+        created_at = models.DateTimeField(auto_now_add=True)
+        last_login = models.DateTimeField(auto_now=True)
 
         USERNAME_FIELD = 'email'
 

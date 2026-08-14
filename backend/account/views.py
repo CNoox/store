@@ -2,7 +2,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.cache import cache
 from rest_framework.permissions import AllowAny
-from .serializer import EmailSerializer,EmailOTPSerializer
+from .serializer import EmailSerializer,EmailOTPSerializer,UserSerializer
 from rest_framework import status
 from rest_framework_simplejwt.tokens import AccessToken
 from .tasks import update_last_login_task
@@ -12,6 +12,7 @@ from .schemas import LOGIN_OTP_RESPONSES, VERIFY_OTP_RESPONSES
 from django.utils import timezone
 from datetime import timedelta
 from .features.send_otp import send_otp
+from account.core.exceptions import NotFound, Throttled, ValidationError
 
 # Create your views here.
 
@@ -43,7 +44,7 @@ class LoginEmailOTPView(APIView):
             send_otp(email)
             return Response({'message': 'OTP code is send.'}, status=status.HTTP_200_OK)
         left = send_time + timedelta(seconds=60) - timezone.now()
-        return Response({'message': 'OTP is already send', 'left_time': left.seconds}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise Throttled(left.seconds)
 
 
 class VerifyOTPView(APIView):
@@ -76,12 +77,14 @@ class VerifyOTPView(APIView):
                     user = UserModel.objects.get(email=email)
                     update_last_login_task.delay(pk=user.pk)
                     token = str(AccessToken.for_user(user))
-                    return Response({'message':'Welcome back.', 'token':token}, status=status.HTTP_200_OK)
+                    serializer = UserSerializer(instance=user)
+                    return Response({'data:': {'user': serializer.data}, 'token': token}, status=status.HTTP_200_OK)
                 user = UserModel.objects.create_user(email=email)
                 update_last_login_task.delay(pk=user.pk)
                 token = str(AccessToken.for_user(user))
-                return Response({'message': 'Account created.', 'token': token}, status=status.HTTP_201_CREATED)
-            return Response({'message':'OTP code is invalid.'}, status=status.HTTP_400_BAD_REQUEST)
+                serializer = UserSerializer(instance=user)
+                return Response({'data:': {'user': serializer.data}, 'token': token}, status=status.HTTP_201_CREATED)
+            raise ValidationError('OTP code verification failed.')
         except:
-            return Response({'message':'OTP code is invalid.'}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError('OTP code verification failed.')
 
