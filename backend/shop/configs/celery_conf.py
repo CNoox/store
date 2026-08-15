@@ -17,7 +17,7 @@ celery_app.conf.result_serializer = 'json'
 celery_app.conf.accept_content = ['json']
 celery_app.conf.result_expires = timedelta(days=1)
 celery_app.conf.task_always_eager = False
-celery_app.conf.worker_prefetch_multiplier = 4
-celery_app.conf.worker_concurrency = 20
+celery_app.conf.worker_prefetch_multiplier = 1
+celery_app.conf.worker_concurrency = 1
 celery_app.conf.broker_connection_retry_on_startup = True
 celery_app.conf.task_acks_late = True
