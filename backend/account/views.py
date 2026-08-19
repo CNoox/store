@@ -18,13 +18,6 @@ from account.core.exceptions import NotFound, Throttled, ValidationError
 
 
 class LoginEmailOTPView(APIView):
-    """
-    Send an OTP code to the specified email address.
-
-    Responses:
-        200: OTP code sent successfully.
-        400: Invalid email.
-    """
     http_method_names = ['post']
     permission_classes = [AllowAny]
     @extend_schema(
@@ -48,14 +41,6 @@ class LoginEmailOTPView(APIView):
 
 
 class VerifyOTPView(APIView):
-    """
-    Verify an OTP code and return an authentication token.
-
-    Returns:
-        200: OTP verified successfully.
-        201: New user created and authenticated.
-        400: Invalid email or OTP.
-    """
     http_method_names = ['post']
     permission_classes = [AllowAny]
     @extend_schema(
@@ -78,12 +63,12 @@ class VerifyOTPView(APIView):
                     update_last_login_task.delay(pk=user.pk)
                     token = str(AccessToken.for_user(user))
                     serializer = UserSerializer(instance=user)
-                    return Response({'data:': {'user': serializer.data}, 'token': token}, status=status.HTTP_200_OK)
+                    return Response({'data': {'user': serializer.data}, 'token': token}, status=status.HTTP_200_OK)
                 user = UserModel.objects.create_user(email=email)
                 update_last_login_task.delay(pk=user.pk)
                 token = str(AccessToken.for_user(user))
                 serializer = UserSerializer(instance=user)
-                return Response({'data:': {'user': serializer.data}, 'token': token}, status=status.HTTP_201_CREATED)
+                return Response({'data': {'user': serializer.data}, 'token': token}, status=status.HTTP_201_CREATED)
             raise ValidationError('OTP code verification failed.')
         except:
             raise ValidationError('OTP code verification failed.')
