@@ -1,6 +1,5 @@
 from celery import shared_task
 from django.conf import settings
-from django.conf.global_settings import EMAIL_HOST_USER
 from .utils import otp_mail, base_mail
 import resend
 from .models import UserModel

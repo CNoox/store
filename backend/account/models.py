@@ -37,3 +37,12 @@ class UserModel(AbstractBaseUser, PermissionsMixin):
 
         def __str__(self):
             return self.email
+
+
+class UserTokenModel(models.Model):
+    user = models.ForeignKey(UserModel, on_delete=models.CASCADE)
+    token = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
