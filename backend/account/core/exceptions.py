@@ -17,10 +17,13 @@ def custom_exception_handler(exc, context):
     if isinstance(exc, ValidationError):
         code = "VALIDATION_ERROR"
         message = "The provided data is invalid."
-    elif isinstance(exc, TokenMissing):
+    elif isinstance(exc, NotAuthenticated):
         code = "TOKEN_MISSING"
         message = "Authentication token is required."
     elif isinstance(exc, TokenInvalid):
+        code = "TOKEN_INVALID"
+        message = "Authentication token is invalid."
+    elif isinstance(exc, AuthenticationFailed):
         code = "TOKEN_INVALID"
         message = "Authentication token is invalid."
     elif isinstance(exc, TokenExpired):

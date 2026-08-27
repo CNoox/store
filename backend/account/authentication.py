@@ -12,7 +12,7 @@ class CustomTokenAuthentication(BaseAuthentication):
     def authenticate(self, request):
         authorization = request.headers.get('Authorization')
         if not authorization:
-            raise TokenMissing('Token is missing.')
+            return None
         authorization_parts = authorization.split()
         if len(authorization_parts) != 2 or authorization_parts[0].lower() != 'bearer':
             raise AuthenticationFailed('Invalid authorization header.')
@@ -29,5 +29,6 @@ class CustomTokenAuthentication(BaseAuthentication):
         if not token.user.is_active:
             raise PermissionDenied('User is banned.')
         return (token.user, token)
-
+    def authenticate_header(self, request):
+        return 'Bearer'
 

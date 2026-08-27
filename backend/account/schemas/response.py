@@ -12,5 +12,5 @@ VERIFY_OTP_RESPONSES = {
 }
 LOGOUT_RESPONSES = {
     200: SCHMessageSerializer,
-    403: SCHErrorResponseSerializer,
+    401: SCHErrorResponseSerializer
 }
