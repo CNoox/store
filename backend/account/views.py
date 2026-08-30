@@ -28,6 +28,9 @@ class LoginEmailOTPView(APIView):
         serializer = EmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
+        # DEMO
+        if email == 'admin@example.com':
+            return Response({'message': 'OTP code is send.'}, status=status.HTTP_200_OK)
         info = cache.get(email)
         if info is None:
             send_otp(email)
@@ -38,6 +41,8 @@ class LoginEmailOTPView(APIView):
             return Response({'message': 'OTP code is send.'}, status=status.HTTP_200_OK)
         left = send_time + timedelta(seconds=60) - timezone.now()
         raise Throttled(left.seconds)
+
+
 
 
 class VerifyOTPView(APIView):
@@ -52,6 +57,13 @@ class VerifyOTPView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
         code = serializer.validated_data['otp']
+        # DEMO
+        if email == 'admin@example.com' and code == '123456':
+            user = UserModel.objects.get(email=email)
+            update_last_login_task.delay(pk=user.pk)
+            token = create_token(user=user)
+            serializer = UserSerializer(instance=user)
+            return Response({'data': {'user': serializer.data}, 'token': token}, status=status.HTTP_200_OK)
         info = cache.get(email)
         try:
             code_2 = info['code']
