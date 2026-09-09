@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+import os
 from pathlib import Path
 from shop.configs.base import *
 from dotenv import load_dotenv
@@ -37,10 +37,12 @@ THIRD_PARTY_APPS = [
     'rest_framework',
     'drf_spectacular',
     'django_celery_beat',
+    'storages',
 ]
 
 LOCAL_APPS = [
     'account.apps.AccountConfig',
+    'product.apps.ProductConfig'
 ]
 
 # Application definition
@@ -158,6 +160,23 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': ('account.authentication.CustomTokenAuthentication',),
     'EXCEPTION_HANDLER': 'account.core.exceptions.custom_exception_handler'
+}
+
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
+AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL')
+AWS_SERVICE_NAME = 's3'
+AWS_S3_FILE_OVERWRITE = False
+
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3.S3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
 }
 
 AUTH_USER_MODEL = "account.UserModel"

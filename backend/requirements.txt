@@ -20,3 +20,7 @@ psycopg2
 
 # Email service
 resend
+
+# Bucket S3
+django-storages[s3]
+boto3
