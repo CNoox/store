@@ -1,77 +1,111 @@
-import json
-
 from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.exceptions import NotFound, ValidationError
-from drf_spectacular.utils import extend_schema
-from paginator import paginate
-from .models import ProductModel, CategoryModel, ProductImageModel, AttributeModel, ProductVariantModel, VariantAttributeValueModel, StaticAttributeModel
-from .serializer import AllProductSerializer, ProductSerializer, ProductImageSerializer
-from .schemas.response import *
-from .models import CategoryModel
-from .serializer import CategorySerializer
-from rest_framework import status, viewsets
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
-from .models import AttributeModel
-from .serializer import AttributeSerializer
+from drf_spectacular.utils import extend_schema
+
+from paginator import paginate
+
+from .models import (
+    ProductModel,
+    ProductImageModel,
+    CategoryModel,
+    AttributeModel,
+)
+from .serializer import (
+    AllProductSerializer,
+    ProductSerializer,
+    ProductImageSerializer,
+    CategorySerializer,
+    AttributeSerializer,
+)
+from .schemas.response import (
+    GET_PRODUCTS_RESPONSE,
+    GET_PRODUCT_RESPONSE,
+    POST_PRODUCT_RESPONSE,
+    UPDATE_PRODUCT_RESPONSE,
+    DELETE_PRODUCT_RESPONSE,
+    GET_PRODUCT_IMAGE_RESPONSE,
+    UPDATE_PRODUCT_IMAGE_RESPONSE,
+    DELETE_IMAGE_RESPONSE,
+    GET_CATEGORIES_RESPONSE,
+    GET_CATEGORY_RESPONSE,
+    POST_CATEGORY_RESPONSE,
+    UPDATE_CATEGORY_RESPONSE,
+    DELETE_CATEGORY_RESPONSE,
+    GET_ATTRIBUTES_RESPONSE,
+)
 
 
 class ProductView(viewsets.ViewSet):
     permission_classes = [AllowAny]
-    queryset = ProductModel.objects.all()
     http_method_names = ['get', 'post', 'patch', 'delete']
+
+    def get_queryset(self):
+        return (
+            ProductModel.objects
+            .select_related('category')
+            .prefetch_related('images', 'values__attribute')
+            .order_by('-id')
+        )
+
     @extend_schema(responses=GET_PRODUCTS_RESPONSE)
     def list(self, request):
-        instance = self.queryset.select_related('category').prefetch_related('images', 'variants__variant_attributes__attribute', 'static_attributes__attribute').order_by('-id')
         paginator = paginate()
-        page = paginator.paginate_queryset(instance, request)
-        serializer = AllProductSerializer(instance=page, many=True)
+        page = paginator.paginate_queryset(self.get_queryset(), request)
+        serializer = AllProductSerializer(page, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data)
 
     @extend_schema(responses=GET_PRODUCT_RESPONSE)
     def retrieve(self, request, pk=None):
-        instance = self.queryset.select_related('category').prefetch_related('images', 'variants__variant_attributes__attribute', 'static_attributes__attribute').filter(pk=pk).first()
+        instance = self.get_queryset().filter(pk=pk).first()
 
         if not instance:
             raise NotFound('Product Not Found.')
 
-        serializer = AllProductSerializer(instance=instance)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(
+            AllProductSerializer(instance, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
 
-    @extend_schema(
-        request=ProductSerializer,
-        responses=POST_PRODUCT_RESPONSE
-    )
+    @extend_schema(request=ProductSerializer, responses=POST_PRODUCT_RESPONSE)
     @transaction.atomic
     def create(self, request):
         serializer = ProductSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         product = serializer.save()
-        return Response(AllProductSerializer(product).data, status=status.HTTP_201_CREATED)
 
-    @extend_schema(
-        request=ProductSerializer,
-        responses=UPDATE_PRODUCT_RESPONSE
-    )
+        return Response(
+            AllProductSerializer(product, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @extend_schema(request=ProductSerializer, responses=UPDATE_PRODUCT_RESPONSE)
     @transaction.atomic
     def partial_update(self, request, pk=None):
-        product = self.queryset.filter(pk=pk).first()
+        product = self.get_queryset().filter(pk=pk).first()
 
         if not product:
             raise NotFound('Product Not Found.')
 
-        serializer = ProductSerializer(product, data=request.data, partial=True, context={'request': request})
+        serializer = ProductSerializer(
+            product,
+            data=request.data,
+            partial=True,
+            context={'request': request},
+        )
         serializer.is_valid(raise_exception=True)
         product = serializer.save()
-        return Response(AllProductSerializer(product).data, status=status.HTTP_200_OK)
+
+        return Response(
+            AllProductSerializer(product, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
 
     @extend_schema(responses=DELETE_PRODUCT_RESPONSE)
     def destroy(self, request, pk=None):
-        product = self.queryset.filter(pk=pk).first()
+        product = self.get_queryset().filter(pk=pk).first()
 
         if not product:
             raise NotFound('Product Not Found.')
@@ -79,15 +113,50 @@ class ProductView(viewsets.ViewSet):
         product.delete()
         return Response({'message': 'Product was deleted.'}, status=status.HTTP_204_NO_CONTENT)
 
-class ProductImageView(viewsets.ModelViewSet):
-    http_method_names = ['delete', 'get', 'patch']
+
+class ProductImageView(viewsets.ViewSet):
     permission_classes = [AllowAny]
-    serializer_class = ProductImageSerializer
-    queryset = ProductImageModel.objects.all()
+    http_method_names = ['get', 'patch', 'delete']
+
+    def get_queryset(self):
+        return ProductImageModel.objects.select_related('product').all()
+
+    @extend_schema(responses=GET_PRODUCT_IMAGE_RESPONSE)
+    def retrieve(self, request, pk=None):
+        image = self.get_queryset().filter(pk=pk).first()
+
+        if not image:
+            raise NotFound('Image Not Found.')
+
+        return Response(
+            ProductImageSerializer(image, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(request=ProductImageSerializer, responses=UPDATE_PRODUCT_IMAGE_RESPONSE)
+    def partial_update(self, request, pk=None):
+        image = self.get_queryset().filter(pk=pk).first()
+
+        if not image:
+            raise NotFound('Image Not Found.')
+
+        serializer = ProductImageSerializer(
+            image,
+            data=request.data,
+            partial=True,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        image = serializer.save()
+
+        return Response(
+            ProductImageSerializer(image, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
 
     @extend_schema(responses=DELETE_IMAGE_RESPONSE)
     def destroy(self, request, pk=None):
-        image = self.queryset.filter(pk=pk).first()
+        image = self.get_queryset().filter(pk=pk).first()
 
         if not image:
             raise NotFound('Image Not Found.')
@@ -95,42 +164,20 @@ class ProductImageView(viewsets.ModelViewSet):
         image.delete()
         return Response({'message': 'Image was deleted.'}, status=status.HTTP_204_NO_CONTENT)
 
-    @extend_schema(responses=GET_PRODUCT_IMAGE_RESPONSE)
-    def retrieve(self, request, pk=None):
-        image = self.queryset.filter(pk=pk).first()
 
-        if not image:
-            raise NotFound('Image Not Found.')
-
-        return Response(ProductImageSerializer(image).data, status=status.HTTP_200_OK)
-
-    @extend_schema(
-        request=ProductImageSerializer,
-        responses=UPDATE_PRODUCT_IMAGE_RESPONSE
-    )
-    def partial_update(self, request, pk=None):
-        image = self.queryset.filter(pk=pk).first()
-
-        if not image:
-            raise NotFound('Image Not Found.')
-
-        serializer = ProductImageSerializer(image, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        image = serializer.save()
-        return Response(ProductImageSerializer(image).data, status=status.HTTP_200_OK)
-
-class CategoryView(viewsets.ModelViewSet):
+class CategoryView(viewsets.ViewSet):
     permission_classes = [AllowAny]
-    queryset = CategoryModel.objects.all().order_by('-id')
-    serializer_class = CategorySerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
+
+    def get_queryset(self):
+        return CategoryModel.objects.all().order_by('-id')
 
     @extend_schema(responses=GET_CATEGORIES_RESPONSE)
     def list(self, request):
         paginator = paginate()
-        page = paginator.paginate_queryset(self.queryset, request)
-        serializer = self.get_serializer(page, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        page = paginator.paginate_queryset(self.get_queryset(), request)
+        serializer = CategorySerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     @extend_schema(responses=GET_CATEGORY_RESPONSE)
     def retrieve(self, request, pk=None):
@@ -139,32 +186,28 @@ class CategoryView(viewsets.ModelViewSet):
         if not category:
             raise NotFound('Category Not Found.')
 
-        return Response(self.get_serializer(category).data, status=status.HTTP_200_OK)
+        return Response(CategorySerializer(category).data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        request=CategorySerializer,
-        responses=POST_CATEGORY_RESPONSE
-    )
+    @extend_schema(request=CategorySerializer, responses=POST_CATEGORY_RESPONSE)
     def create(self, request):
-        serializer = self.get_serializer(data=request.data)
+        serializer = CategorySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         category = serializer.save()
-        return Response(self.get_serializer(category).data, status=status.HTTP_201_CREATED)
 
-    @extend_schema(
-        request=CategorySerializer,
-        responses=UPDATE_CATEGORY_RESPONSE
-    )
+        return Response(CategorySerializer(category).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(request=CategorySerializer, responses=UPDATE_CATEGORY_RESPONSE)
     def partial_update(self, request, pk=None):
         category = self.get_queryset().filter(pk=pk).first()
 
         if not category:
             raise NotFound('Category Not Found.')
 
-        serializer = self.get_serializer(category, data=request.data, partial=True)
+        serializer = CategorySerializer(category, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         category = serializer.save()
-        return Response(self.get_serializer(category).data, status=status.HTTP_200_OK)
+
+        return Response(CategorySerializer(category).data, status=status.HTTP_200_OK)
 
     @extend_schema(responses=DELETE_CATEGORY_RESPONSE)
     def destroy(self, request, pk=None):
@@ -176,12 +219,24 @@ class CategoryView(viewsets.ModelViewSet):
         category.delete()
         return Response({'message': 'Category was deleted.'}, status=status.HTTP_204_NO_CONTENT)
 
+
 class AttributeView(viewsets.ViewSet):
     permission_classes = [AllowAny]
-    queryset = AttributeModel.objects.all().order_by('-id')
     http_method_names = ['get']
+
+    def get_queryset(self):
+        return AttributeModel.objects.all().order_by('-id')
 
     @extend_schema(responses=GET_ATTRIBUTES_RESPONSE)
     def list(self, request):
-        serializer = AttributeSerializer(self.queryset, many=True)
+        serializer = AttributeSerializer(self.get_queryset(), many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(responses=GET_ATTRIBUTES_RESPONSE)
+    def retrieve(self, request, pk=None):
+        attribute = self.get_queryset().filter(pk=pk).first()
+
+        if not attribute:
+            raise NotFound('Attribute Not Found.')
+
+        return Response(AttributeSerializer(attribute).data, status=status.HTTP_200_OK)

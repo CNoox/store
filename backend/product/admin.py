@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CategoryModel, ProductModel, ProductImageModel, AttributeModel, ProductVariantModel, StaticAttributeModel, VariantAttributeValueModel
+from .models import CategoryModel, ProductModel, ProductImageModel, AttributeModel, AttributeValueModel
 from unfold.admin import ModelAdmin
 
 # Register your models here.
@@ -22,16 +22,9 @@ class ProductImageModelAdmin(ModelAdmin):
 class ProductAttributeModelAdmin(ModelAdmin):
     list_display = ('key', 'type')
 
+@admin.register(AttributeValueModel)
+class AttributeValueModelAdmin(ModelAdmin):
+    list_display = ('attribute', 'value')
 
-@admin.register(ProductVariantModel)
-class ProductVariantModelAdmin(ModelAdmin):
-    list_display = ('product', 'price', 'stock')
-
-
-@admin.register(VariantAttributeValueModel)
-class VariantAttributeValueModelAdmin(ModelAdmin):
-    list_display = ('variant', 'attribute', 'label', 'value')
-
-@admin.register(StaticAttributeModel)
-class StaticAttributeModelAdmin(ModelAdmin):
-    list_display = ('product', 'attribute', 'label', 'value')
+    def get_attribute(self, obj):
+        return obj.attribute.key

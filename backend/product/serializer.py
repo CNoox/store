@@ -1,17 +1,12 @@
 import json
-
 from django.db import transaction
-
 from rest_framework import serializers
-
 from .models import (
-    VariantAttributeValueModel,
     AttributeModel,
+    AttributeValueModel,
     ProductImageModel,
     ProductModel,
     CategoryModel,
-    ProductVariantModel,
-    StaticAttributeModel
 )
 
 
@@ -34,7 +29,6 @@ class JSONListField(serializers.ListField):
 
 class CategorySerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField()
-    name = serializers.CharField()
     slug = serializers.SlugField(read_only=True)
 
     class Meta:
@@ -52,214 +46,7 @@ class CategoryField(serializers.RelatedField):
             raise serializers.ValidationError('Category Not Found.')
 
     def to_representation(self, value):
-        return CategorySerializer(value).data
-
-
-class VariantAttributeValueSerializer(serializers.ModelSerializer):
-    id = serializers.ReadOnlyField()
-    attribute = serializers.CharField(source='attribute.key')
-    attribute_type = serializers.CharField(source='attribute.type')
-
-    class Meta:
-        model = VariantAttributeValueModel
-        fields = ['id', 'attribute', 'attribute_type', 'label', 'value']
-
-
-class VariantAttributeValueWriteSerializer(serializers.Serializer):
-    key = serializers.CharField(max_length=100)
-    type = serializers.ChoiceField(choices=AttributeModel.TypeChoices.choices)
-    label = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
-    value = serializers.CharField(max_length=100)
-
-
-class ProductVariantSerializer(serializers.ModelSerializer):
-    id = serializers.ReadOnlyField()
-    variant_is_available = serializers.SerializerMethodField(read_only=True)
-    attributes = VariantAttributeValueSerializer(source='variant_attributes', many=True, read_only=True)
-
-    class Meta:
-        model = ProductVariantModel
-        fields = ['id', 'price', 'stock', 'variant_is_available', 'attributes']
-
-    def get_variant_is_available(self, obj):
-        return obj.stock > 0
-
-
-class ProductVariantWriteSerializer(serializers.ModelSerializer):
-    attributes = JSONListField(child=VariantAttributeValueWriteSerializer())
-
-    class Meta:
-        model = ProductVariantModel
-        fields = ['price', 'stock', 'attributes']
-
-
-class ProductImageSerializer(serializers.ModelSerializer):
-    id = serializers.ReadOnlyField()
-    image = serializers.ImageField()
-    alt = serializers.SerializerMethodField(read_only=True)
-
-    class Meta:
-        model = ProductImageModel
-        fields = ['id', 'image', 'alt']
-
-    def get_alt(self, obj):
-        return obj.product.name
-
-
-class StaticAttributeSerializer(serializers.ModelSerializer):
-    id = serializers.ReadOnlyField()
-    product_id = serializers.IntegerField(source='product.id', read_only=True)
-    attribute = serializers.CharField(source='attribute.key')
-    attribute_type = serializers.CharField(source='attribute.type')
-
-    class Meta:
-        model = StaticAttributeModel
-        fields = ['id', 'product_id', 'attribute', 'attribute_type', 'label', 'value']
-
-
-class StaticAttributeWriteSerializer(serializers.Serializer):
-    key = serializers.CharField(max_length=100)
-    type = serializers.ChoiceField(choices=AttributeModel.TypeChoices.choices)
-    label = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
-    value = serializers.CharField(max_length=100)
-
-
-class ProductSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(read_only=True)
-    slug = serializers.SlugField(read_only=True)
-    category = CategoryField()
-    images = serializers.ListField(child=serializers.ImageField(), write_only=True, required=False)
-    variants = JSONListField(child=ProductVariantWriteSerializer(), write_only=True, required=False)
-    static_attributes = JSONListField(child=StaticAttributeWriteSerializer(), write_only=True, required=False)
-
-    class Meta:
-        model = ProductModel
-        fields = ['id', 'name', 'slug', 'description', 'category', 'images', 'variants', 'static_attributes']
-
-    def validate(self, attrs):
-        if not self.instance and not attrs.get('images'):
-            request = self.context.get('request')
-
-            if not request or not request.FILES.getlist('images'):
-                raise serializers.ValidationError({
-                    'images': 'At least one image is required.'
-                })
-
-        return attrs
-
-    def get_attribute(self, attribute_data):
-        key = attribute_data['key']
-        attribute_type = attribute_data['type']
-
-        try:
-            attribute = AttributeModel.objects.get(key=key)
-        except AttributeModel.DoesNotExist:
-            raise serializers.ValidationError({
-                'attribute': f'Attribute "{key}" does not exist.'
-            })
-
-        if attribute.type != attribute_type:
-            raise serializers.ValidationError({
-                'attribute': f'Attribute "{key}" has type "{attribute.type}", not "{attribute_type}".'
-            })
-
-        return attribute
-
-    def create_variant_attributes(self, variant, attributes):
-        for attribute_data in attributes:
-            attribute = self.get_attribute(attribute_data)
-
-            VariantAttributeValueModel.objects.create(
-                variant=variant,
-                attribute=attribute,
-                label=attribute_data.get('label'),
-                value=attribute_data['value']
-            )
-
-    def create_static_attributes(self, product, attributes):
-        for attribute_data in attributes:
-            attribute = self.get_attribute(attribute_data)
-
-            StaticAttributeModel.objects.create(
-                product=product,
-                attribute=attribute,
-                label=attribute_data.get('label'),
-                value=attribute_data['value']
-            )
-
-    @transaction.atomic
-    def create(self, validated_data):
-        images = validated_data.pop('images', [])
-        variants = validated_data.pop('variants', [])
-        static_attributes = validated_data.pop('static_attributes', [])
-
-        product = ProductModel.objects.create(**validated_data)
-
-        for image in images:
-            ProductImageModel.objects.create(product=product, image=image)
-
-        for variant_data in variants:
-            attributes = variant_data.pop('attributes', [])
-            variant = ProductVariantModel.objects.create(product=product, **variant_data)
-            self.create_variant_attributes(variant, attributes)
-
-        self.create_static_attributes(product, static_attributes)
-
-        return product
-
-    @transaction.atomic
-    def update(self, instance, validated_data):
-        images = validated_data.pop('images', [])
-        variants = validated_data.pop('variants', None)
-        static_attributes = validated_data.pop('static_attributes', None)
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-
-        instance.save()
-
-        for image in images:
-            ProductImageModel.objects.create(product=instance, image=image)
-
-        if variants is not None:
-            instance.variants.all().delete()
-
-            for variant_data in variants:
-                attributes = variant_data.pop('attributes', [])
-                variant = ProductVariantModel.objects.create(product=instance, **variant_data)
-                self.create_variant_attributes(variant, attributes)
-
-        if static_attributes is not None:
-            instance.static_attributes.all().delete()
-            self.create_static_attributes(instance, static_attributes)
-
-        return instance
-
-
-class AllProductSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(read_only=True)
-    category = serializers.CharField(source='category.name')
-    images = ProductImageSerializer(many=True, read_only=True)
-    variants = ProductVariantSerializer(many=True, read_only=True)
-    product_is_available = serializers.SerializerMethodField(read_only=True)
-    static_attributes = StaticAttributeSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = ProductModel
-        fields = [
-            'id',
-            'name',
-            'slug',
-            'description',
-            'category',
-            'images',
-            'variants',
-            'static_attributes',
-            'product_is_available'
-        ]
-
-    def get_product_is_available(self, obj):
-        return obj.variants.filter(stock__gt=0).exists()
+        return value.slug
 
 
 class AttributeSerializer(serializers.ModelSerializer):
@@ -270,7 +57,190 @@ class AttributeSerializer(serializers.ModelSerializer):
         fields = ['id', 'key', 'type']
 
 
-# ==================================
+class ProductImageSerializer(serializers.ModelSerializer):
+    id = serializers.ReadOnlyField()
+    url = serializers.SerializerMethodField()
+    alt = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductImageModel
+        fields = ['id', 'url', 'alt']
+
+    def get_url(self, obj):
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.image.url)
+        return obj.image.url
+
+    def get_alt(self, obj):
+        return obj.product.name
+
+
+class AttributeWriteSerializer(serializers.Serializer):
+    key = serializers.CharField(max_length=100)
+    type = serializers.ChoiceField(choices=AttributeModel.TypeChoices.choices,read_only=True)
+    values = serializers.ListField(child=serializers.CharField(max_length=100))
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(read_only=True)
+    slug = serializers.SlugField(read_only=True)
+    category = CategoryField()
+    images = serializers.ListField(
+        child=serializers.ImageField(),
+        write_only=True,
+        required=False,
+    )
+    attribute_list = JSONListField(
+        child=AttributeWriteSerializer(),
+        write_only=True,
+        required=False,
+    )
+
+    class Meta:
+        model = ProductModel
+        fields = [
+            'id',
+            'name',
+            'slug',
+            'description',
+            'category',
+            'base_price',
+            'discounted_price',
+            'stock',
+            'images',
+            'attribute_list',
+        ]
+
+    def validate(self, attrs):
+        if not self.instance and not attrs.get('images'):
+            request = self.context.get('request')
+            if not request or not request.FILES.getlist('images'):
+                raise serializers.ValidationError({
+                    'images': 'At least one image is required.'
+                })
+
+        base_price = attrs.get('base_price', getattr(self.instance, 'base_price', 0))
+        discounted_price = attrs.get('discounted_price', getattr(self.instance, 'discounted_price', None))
+
+        if discounted_price and discounted_price > base_price:
+            raise serializers.ValidationError({
+                'discounted_price': 'Discounted price cannot be greater than base price.'
+            })
+
+        return attrs
+
+    def _get_attribute(self, key: str) -> AttributeModel:
+        try:
+            attribute = AttributeModel.objects.get(key=key)
+        except AttributeModel.DoesNotExist:
+            raise serializers.ValidationError({
+                'attribute': f'Attribute "{key}" does not exist.'
+            })
+
+        return attribute
+
+    def _create_attribute_list(self, product: ProductModel, attribute_list: list):
+        for attr_data in attribute_list:
+            attribute = self._get_attribute(attr_data['key'])
+
+            for val in attr_data['values']:
+                AttributeValueModel.objects.get_or_create(
+                    product=product,
+                    attribute=attribute,
+                    value=val,
+                )
+
+    @transaction.atomic
+    def create(self, validated_data):
+        images = validated_data.pop('images', [])
+        attribute_list = validated_data.pop('attribute_list', [])
+
+        product = ProductModel.objects.create(**validated_data)
+
+        for image in images:
+            ProductImageModel.objects.create(product=product, image=image)
+
+        self._create_attribute_list(product, attribute_list)
+
+        return product
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        images = validated_data.pop('images', [])
+        attribute_list = validated_data.pop('attribute_list', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        for image in images:
+            ProductImageModel.objects.create(product=instance, image=image)
+
+        if attribute_list is not None:
+            instance.values.all().delete()
+            self._create_attribute_list(instance, attribute_list)
+
+        return instance
+
+
+class AllProductSerializer(serializers.ModelSerializer):
+    id = serializers.SerializerMethodField()
+    category = serializers.CharField(source='category.slug')
+    category_label = serializers.CharField(source='category.name')
+    images = serializers.SerializerMethodField()
+    is_available = serializers.SerializerMethodField()
+    attribute_list = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductModel
+        fields = [
+            'id',
+            'name',
+            'category',
+            'category_label',
+            'description',
+            'stock',
+            'base_price',
+            'discounted_price',
+            'images',
+            'is_available',
+            'attribute_list',
+        ]
+
+    def get_id(self, obj) -> str:
+        return f'prod_{obj.pk}'
+
+    def get_images(self, obj) -> list:
+        request = self.context.get('request')
+        return [
+            {
+                'url': request.build_absolute_uri(img.image.url) if request else img.image.url,
+                'alt': obj.name,
+            }
+            for img in obj.images.all()
+        ]
+
+    def get_is_available(self, obj) -> bool:
+        return obj.stock > 0
+
+    def get_attribute_list(self, obj) -> list:
+        grouped = {}
+
+        for av in obj.values.select_related('attribute').all():
+            key = av.attribute.key
+
+            if key not in grouped:
+                grouped[key] = {
+                    'key': av.attribute.key,
+                    'type': av.attribute.type,
+                    'values': [],
+                }
+
+            grouped[key]['values'].append(av.value)
+
+        return list(grouped.values())
+
 
 class ProductPaginationSerializer(serializers.Serializer):
     count = serializers.IntegerField()
