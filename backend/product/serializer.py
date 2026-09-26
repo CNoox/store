@@ -89,7 +89,6 @@ class ProductSerializer(serializers.ModelSerializer):
     images = serializers.ListField(
         child=serializers.ImageField(),
         write_only=True,
-        required=False,
     )
     attribute_list = JSONListField(
         child=AttributeWriteSerializer(),
@@ -120,10 +119,10 @@ class ProductSerializer(serializers.ModelSerializer):
                     'images': 'At least one image is required.'
                 })
 
-        base_price = attrs.get('base_price', getattr(self.instance, 'base_price', 0))
+        base_price = attrs.get('base_price', getattr(self.instance, 'base_price'))
         discounted_price = attrs.get('discounted_price', getattr(self.instance, 'discounted_price', None))
 
-        if discounted_price and discounted_price > base_price:
+        if discounted_price and discounted_price >= base_price:
             raise serializers.ValidationError({
                 'discounted_price': 'Discounted price cannot be greater than base price.'
             })
@@ -247,3 +246,7 @@ class ProductPaginationSerializer(serializers.Serializer):
     next = serializers.CharField(allow_null=True)
     previous = serializers.CharField(allow_null=True)
     results = AllProductSerializer(many=True)
+
+class AttrValueSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    value = serializers.ListField()

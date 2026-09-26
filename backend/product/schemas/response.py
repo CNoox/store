@@ -2,7 +2,7 @@ from product.serializer import (
     AllProductSerializer,
     ProductImageSerializer,
     CategorySerializer,
-    AttributeSerializer,
+    AttrValueSerializer,
     ProductPaginationSerializer,
 )
 from account.serializer import SCHErrorResponseSerializer, SCHMessageSerializer
@@ -23,4 +23,4 @@ POST_CATEGORY_RESPONSE = {201: CategorySerializer, 400: SCHErrorResponseSerializ
 UPDATE_CATEGORY_RESPONSE = {200: CategorySerializer, 400: SCHErrorResponseSerializer, 404: SCHErrorResponseSerializer}
 DELETE_CATEGORY_RESPONSE = {204: SCHMessageSerializer, 404: SCHErrorResponseSerializer}
 
-GET_ATTRIBUTES_RESPONSE = {200: AttributeSerializer}
+GET_ATTRIBUTES_RESPONSE = {200: AttrValueSerializer}

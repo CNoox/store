@@ -3,7 +3,9 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema,OpenApiParameter
+from django.db.models import Q
+from permission import IsOwnerorReadonly
 
 from paginator import paginate
 
@@ -12,6 +14,7 @@ from .models import (
     ProductImageModel,
     CategoryModel,
     AttributeModel,
+    AttributeValueModel,
 )
 from .serializer import (
     AllProductSerializer,
@@ -39,21 +42,46 @@ from .schemas.response import (
 
 
 class ProductView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
+    permission_classes = [IsOwnerorReadonly]
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_queryset(self):
-        return (
-            ProductModel.objects
-            .select_related('category')
-            .prefetch_related('images', 'values__attribute')
-            .order_by('-id')
-        )
+        return (ProductModel.objects.select_related('category').prefetch_related('images', 'values__attribute').order_by('-id'))
 
-    @extend_schema(responses=GET_PRODUCTS_RESPONSE)
+    @extend_schema(responses=GET_PRODUCTS_RESPONSE,
+                   description='**برای فیلتر داینامیک**\n\n - **/?key=value&key=value**\n\n - **/?رنگ=blue&جنس=nakh**',
+                   parameters=[
+                       OpenApiParameter('search', str, description='**جستجو در نام و توضیحات**'),
+                       OpenApiParameter('category', str, description='**فیلتر بر اساس دسته‌بندی**'),
+                       OpenApiParameter('page', str, description='**رفتن به شماره صفحه**'),
+                       OpenApiParameter('page_size', str, description='**تنظیم کردن سایز صفحه**'),
+                       OpenApiParameter('رنگ',str,description='**فیلتر داینامیک(رنگ)**'),
+                       OpenApiParameter('جنس',str,description='**فیلتر داینامیک(جنس)**'),
+                       OpenApiParameter('min_price', int, description='حداقل قیمت'),
+                       OpenApiParameter('max_price', int, description='حداکثر قیمت'),
+                   ])
     def list(self, request):
+        queryset = self.get_queryset()
+        search = request.query_params.get("search")
+        category = request.query_params.get("category")
+        min_price = request.query_params.get("min_price")
+        max_price = request.query_params.get("max_price")
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) |Q(description__icontains=search))
+        if category:
+            queryset = queryset.filter(category__name=category)
+        valid_attribute_keys = AttributeModel.objects.values_list('key', flat=True)
+        for key in valid_attribute_keys:
+            param_value = request.query_params.get(key)
+            if param_value:
+                queryset = queryset.filter(values__attribute__key=key,values__value__iexact=param_value)
+        if min_price:
+            queryset = queryset.filter(base_price__gte=min_price)
+        if max_price:
+            queryset = queryset.filter(base_price__lte=max_price)
+        queryset = queryset.distinct()
         paginator = paginate()
-        page = paginator.paginate_queryset(self.get_queryset(), request)
+        page = paginator.paginate_queryset(queryset, request)
         serializer = AllProductSerializer(page, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data)
 
@@ -115,7 +143,7 @@ class ProductView(viewsets.ViewSet):
 
 
 class ProductImageView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
+    permission_classes = [IsOwnerorReadonly]
     http_method_names = ['get', 'patch', 'delete']
 
     def get_queryset(self):
@@ -166,7 +194,7 @@ class ProductImageView(viewsets.ViewSet):
 
 
 class CategoryView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
+    permission_classes = [IsOwnerorReadonly]
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_queryset(self):
@@ -229,8 +257,12 @@ class AttributeView(viewsets.ViewSet):
 
     @extend_schema(responses=GET_ATTRIBUTES_RESPONSE)
     def list(self, request):
-        serializer = AttributeSerializer(self.get_queryset(), many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        attr = self.get_queryset().values_list('key','values__value').distinct()
+        data = {}
+        for key,values in attr:
+            data.setdefault(key,[]).append(values)
+        result = [{'key': key, 'values': values} for key, values in data.items()]
+        return Response(result, status=status.HTTP_200_OK)
 
     @extend_schema(responses=GET_ATTRIBUTES_RESPONSE)
     def retrieve(self, request, pk=None):
