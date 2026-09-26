@@ -49,7 +49,14 @@ class ProductView(viewsets.ViewSet):
         return (ProductModel.objects.select_related('category').prefetch_related('images', 'values__attribute').order_by('-id'))
 
     @extend_schema(responses=GET_PRODUCTS_RESPONSE,
-                   description='**برای فیلتر داینامیک**\n\n - **/?key=value&key=value**\n\n - **/?رنگ=blue&جنس=nakh**',
+                   description='**برای فیلتر داینامیک**\n\n'
+                               ' - **/?key=value&key=value**\n'
+                               ' - **/?رنگ=blue&جنس=nakh**\n\n'
+                               '**برای مرتب سازی از این عبارات استفاده شده**\n\n'
+                               ' - **/?sort=oldest**\n'
+                               ' - **/?sort=price**\n'
+                               ' - **/?sort=-price**\n\n'
+                               '**نکته! جدیدترین محصول به صورت پیشفرض دیده میشود و نیاز به مرتب سازی ندارد**',
                    parameters=[
                        OpenApiParameter('search', str, description='**جستجو در نام و توضیحات**'),
                        OpenApiParameter('category', str, description='**فیلتر بر اساس دسته‌بندی**'),
@@ -57,8 +64,9 @@ class ProductView(viewsets.ViewSet):
                        OpenApiParameter('page_size', str, description='**تنظیم کردن سایز صفحه**'),
                        OpenApiParameter('رنگ',str,description='**فیلتر داینامیک(رنگ)**'),
                        OpenApiParameter('جنس',str,description='**فیلتر داینامیک(جنس)**'),
-                       OpenApiParameter('min_price', int, description='حداقل قیمت'),
-                       OpenApiParameter('max_price', int, description='حداکثر قیمت'),
+                       OpenApiParameter('min_price', int, description='**حداقل قیمت**'),
+                       OpenApiParameter('max_price', int, description='**حداکثر قیمت**'),
+                       OpenApiParameter('sort',str, description='**مرتب سازی بر اساس آپشن ها**')
                    ])
     def list(self, request):
         queryset = self.get_queryset()
@@ -66,6 +74,7 @@ class ProductView(viewsets.ViewSet):
         category = request.query_params.get("category")
         min_price = request.query_params.get("min_price")
         max_price = request.query_params.get("max_price")
+        sort = request.query_params.get("sort")
         if search:
             queryset = queryset.filter(Q(name__icontains=search) |Q(description__icontains=search))
         if category:
@@ -79,6 +88,13 @@ class ProductView(viewsets.ViewSet):
             queryset = queryset.filter(base_price__gte=min_price)
         if max_price:
             queryset = queryset.filter(base_price__lte=max_price)
+        if sort:
+            if sort == 'price':
+                queryset = queryset.order_by('base_price')
+            elif sort == '-price':
+                queryset = queryset.order_by('-base_price')
+            elif sort == 'oldest':
+                queryset = queryset.order_by('id')
         queryset = queryset.distinct()
         paginator = paginate()
         page = paginator.paginate_queryset(queryset, request)
@@ -249,7 +265,7 @@ class CategoryView(viewsets.ViewSet):
 
 
 class AttributeView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
+    permission_classes = [IsOwnerorReadonly]
     http_method_names = ['get']
 
     def get_queryset(self):
