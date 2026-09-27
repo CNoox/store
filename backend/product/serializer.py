@@ -184,7 +184,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class AllProductSerializer(serializers.ModelSerializer):
-    id = serializers.SerializerMethodField()
+    id = serializers.IntegerField(read_only=True)
     category = serializers.CharField(source='category.slug')
     category_label = serializers.CharField(source='category.name')
     images = serializers.SerializerMethodField()
@@ -206,9 +206,6 @@ class AllProductSerializer(serializers.ModelSerializer):
             'is_available',
             'attribute_list',
         ]
-
-    def get_id(self, obj) -> str:
-        return f'prod_{obj.pk}'
 
     def get_images(self, obj) -> list:
         request = self.context.get('request')
