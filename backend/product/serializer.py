@@ -239,10 +239,11 @@ class AllProductSerializer(serializers.ModelSerializer):
 
 
 class ProductPaginationSerializer(serializers.Serializer):
-    count = serializers.IntegerField()
-    next = serializers.CharField(allow_null=True)
-    previous = serializers.CharField(allow_null=True)
-    results = AllProductSerializer(many=True)
+    count = serializers.IntegerField(read_only=True)
+    page = serializers.IntegerField(read_only=True)
+    page_size = serializers.IntegerField(read_only=True)
+    total_pages = serializers.IntegerField(read_only=True)
+    results = AllProductSerializer(many=True,read_only=True)
 
 class AttrValueSerializer(serializers.Serializer):
     key = serializers.CharField()
