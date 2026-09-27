@@ -60,7 +60,6 @@ class VerifyOTPView(APIView):
         # DEMO
         if email == 'admin@example.com' and code == '123456':
             user = UserModel.objects.get(email=email)
-            update_last_login_task.delay(pk=user.pk)
             token = create_token(user=user)
             serializer = UserSerializer(instance=user)
             return Response({'data': {'user': serializer.data}, 'token': token}, status=status.HTTP_200_OK)
