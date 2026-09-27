@@ -26,6 +26,12 @@ class ProductModel(models.Model):
     base_price = models.PositiveBigIntegerField()
     discounted_price = models.PositiveBigIntegerField(blank=True, null=True)
     stock = models.PositiveSmallIntegerField()
+    attribute_values = models.ManyToManyField(
+        'AttributeValueModel',
+        through='ProductAttributeValue',
+        related_name='products',
+        blank=True,
+    )
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -59,11 +65,35 @@ class AttributeModel(models.Model):
         return f'{self.key}'
 
 class AttributeValueModel(models.Model):
-    product = models.ForeignKey(ProductModel, on_delete=models.CASCADE, related_name='values')
     attribute = models.ForeignKey(AttributeModel, on_delete=models.CASCADE, related_name='values')
     value = models.CharField(max_length=100)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['attribute', 'product','value'],name='unique_product_attribute_value')]
+        constraints = [models.UniqueConstraint(fields=['attribute','value'],name='unique_attribute_value')]
     def __str__(self):
-        return f'{self.attribute}'
+        return f'{self.attribute} - {self.value}'
+
+class ProductAttributeValue(models.Model):
+    product = models.ForeignKey(ProductModel, on_delete=models.CASCADE, related_name='product_attribute_values')
+    attribute_value = models.ForeignKey(AttributeValueModel, on_delete=models.CASCADE, related_name='product_attribute_values')
+
+    def clean(self):
+        if not self.product_id or not self.attribute_value_id:
+            return
+
+        exists = ProductAttributeValue.objects.filter(
+            product_id=self.product_id,
+            attribute_value__attribute_id=self.attribute_value.attribute_id,
+        ).exclude(pk=self.pk).exists()
+
+        if exists:
+            raise ValidationError(
+                'این محصول برای این ویژگی قبلاً یک مقدار دارد.'
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.product.name} - {self.attribute_value}'

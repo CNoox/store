@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CategoryModel, ProductModel, ProductImageModel, AttributeModel, AttributeValueModel
+from .models import CategoryModel, ProductModel, ProductImageModel, AttributeModel, AttributeValueModel, ProductAttributeValue
 from unfold.admin import ModelAdmin
 
 # Register your models here.
@@ -28,3 +28,7 @@ class AttributeValueModelAdmin(ModelAdmin):
 
     def get_attribute(self, obj):
         return obj.attribute.key
+
+@admin.register(ProductAttributeValue)
+class ProductAttributeValueAdmin(ModelAdmin):
+    list_display = ('attribute_value', 'product')

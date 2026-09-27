@@ -4,6 +4,7 @@ from rest_framework import serializers
 from .models import (
     AttributeModel,
     AttributeValueModel,
+    ProductAttributeValue,
     ProductImageModel,
     ProductModel,
     CategoryModel,
@@ -57,6 +58,15 @@ class AttributeSerializer(serializers.ModelSerializer):
         fields = ['id', 'key', 'type']
 
 
+class AttributeValueSerializer(serializers.ModelSerializer):
+    attribute_key = serializers.CharField(source='attribute.key', read_only=True)
+    attribute_type = serializers.CharField(source='attribute.type', read_only=True)
+
+    class Meta:
+        model = AttributeValueModel
+        fields = ['id', 'attribute_key', 'attribute_type', 'value']
+
+
 class ProductImageSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField()
     url = serializers.SerializerMethodField()
@@ -78,8 +88,12 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
 class AttributeWriteSerializer(serializers.Serializer):
     key = serializers.CharField(max_length=100)
-    type = serializers.ChoiceField(choices=AttributeModel.TypeChoices.choices,read_only=True)
     values = serializers.ListField(child=serializers.CharField(max_length=100))
+
+    def validate_values(self, value):
+        if len(value) != 1:
+            raise serializers.ValidationError('Must be one value.')
+        return value
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -119,36 +133,38 @@ class ProductSerializer(serializers.ModelSerializer):
                     'images': 'At least one image is required.'
                 })
 
-        base_price = attrs.get('base_price', getattr(self.instance, 'base_price'))
+        base_price = attrs.get('base_price', getattr(self.instance, 'base_price', None))
         discounted_price = attrs.get('discounted_price', getattr(self.instance, 'discounted_price', None))
 
-        if discounted_price and discounted_price >= base_price:
+        if discounted_price and base_price and discounted_price >= base_price:
             raise serializers.ValidationError({
                 'discounted_price': 'Discounted price cannot be greater than base price.'
             })
 
         return attrs
 
-    def _get_attribute(self, key: str) -> AttributeModel:
-        try:
-            attribute = AttributeModel.objects.get(key=key)
-        except AttributeModel.DoesNotExist:
-            raise serializers.ValidationError({
-                'attribute': f'Attribute "{key}" does not exist.'
-            })
+    def _get_or_create_attribute_values(self, attribute_list: list) -> list[AttributeValueModel]:
+        result = []
 
-        return attribute
-
-    def _create_attribute_list(self, product: ProductModel, attribute_list: list):
         for attr_data in attribute_list:
-            attribute = self._get_attribute(attr_data['key'])
+            key = attr_data['key']
+            values = attr_data['values']
 
-            for val in attr_data['values']:
-                AttributeValueModel.objects.get_or_create(
-                    product=product,
+            try:
+                attribute = AttributeModel.objects.get(key=key)
+            except AttributeModel.DoesNotExist:
+                raise serializers.ValidationError({
+                    'attribute_list': f'Attribute "{key}" does not exist.'
+                })
+
+            for val in values:
+                attr_value, _ = AttributeValueModel.objects.get_or_create(
                     attribute=attribute,
                     value=val,
                 )
+                result.append(attr_value)
+
+        return result
 
     @transaction.atomic
     def create(self, validated_data):
@@ -160,7 +176,13 @@ class ProductSerializer(serializers.ModelSerializer):
         for image in images:
             ProductImageModel.objects.create(product=product, image=image)
 
-        self._create_attribute_list(product, attribute_list)
+        if attribute_list:
+            attr_values = self._get_or_create_attribute_values(attribute_list)
+            for attr_value in attr_values:
+                ProductAttributeValue.objects.get_or_create(
+                    product=product,
+                    attribute_value=attr_value,
+                )
 
         return product
 
@@ -177,8 +199,14 @@ class ProductSerializer(serializers.ModelSerializer):
             ProductImageModel.objects.create(product=instance, image=image)
 
         if attribute_list is not None:
-            instance.values.all().delete()
-            self._create_attribute_list(instance, attribute_list)
+            instance.product_attribute_values.all().delete()
+
+            attr_values = self._get_or_create_attribute_values(attribute_list)
+            for attr_value in attr_values:
+                ProductAttributeValue.objects.get_or_create(
+                    product=instance,
+                    attribute_value=attr_value,
+                )
 
         return instance
 
@@ -196,6 +224,7 @@ class AllProductSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'name',
+            'slug',
             'category',
             'category_label',
             'description',
@@ -223,12 +252,15 @@ class AllProductSerializer(serializers.ModelSerializer):
     def get_attribute_list(self, obj) -> list:
         grouped = {}
 
-        for av in obj.values.select_related('attribute').all():
+        for pav in obj.product_attribute_values.select_related(
+            'attribute_value__attribute'
+        ).all():
+            av = pav.attribute_value
             key = av.attribute.key
 
             if key not in grouped:
                 grouped[key] = {
-                    'key': av.attribute.key,
+                    'key': key,
                     'type': av.attribute.type,
                     'values': [],
                 }
@@ -243,7 +275,8 @@ class ProductPaginationSerializer(serializers.Serializer):
     page = serializers.IntegerField(read_only=True)
     page_size = serializers.IntegerField(read_only=True)
     total_pages = serializers.IntegerField(read_only=True)
-    results = AllProductSerializer(many=True,read_only=True)
+    results = AllProductSerializer(many=True, read_only=True)
+
 
 class AttrValueSerializer(serializers.Serializer):
     key = serializers.CharField()

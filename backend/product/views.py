@@ -3,7 +3,7 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
-from drf_spectacular.utils import extend_schema,OpenApiParameter
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.db.models import Q
 from permission import IsOwnerorReadonly
 
@@ -46,48 +46,63 @@ class ProductView(viewsets.ViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_queryset(self):
-        return (ProductModel.objects.select_related('category').prefetch_related('images', 'values__attribute').order_by('-id'))
+        return (
+            ProductModel.objects
+            .select_related('category')
+            .prefetch_related(
+                'images',
+                'product_attribute_values__attribute_value__attribute',
+            )
+            .order_by('-id')
+        )
 
-    @extend_schema(responses=GET_PRODUCTS_RESPONSE,
-                   description='**برای فیلتر داینامیک**\n\n'
-                               ' - **/?key=value&key=value**\n'
-                               ' - **/?رنگ=blue&جنس=nakh**\n\n'
-                               '**برای مرتب سازی از این عبارات استفاده شده**\n\n'
-                               ' - **/?sort=oldest**\n'
-                               ' - **/?sort=price**\n'
-                               ' - **/?sort=-price**\n\n'
-                               '**نکته! جدیدترین محصول به صورت پیشفرض دیده میشود و نیاز به مرتب سازی ندارد**',
-                   parameters=[
-                       OpenApiParameter('search', str, description='**جستجو در نام و توضیحات**'),
-                       OpenApiParameter('category', str, description='**فیلتر بر اساس دسته‌بندی**'),
-                       OpenApiParameter('page', str, description='**رفتن به شماره صفحه**'),
-                       OpenApiParameter('page_size', str, description='**تنظیم کردن سایز صفحه**'),
-                       OpenApiParameter('رنگ',str,description='**فیلتر داینامیک(رنگ)**'),
-                       OpenApiParameter('جنس',str,description='**فیلتر داینامیک(جنس)**'),
-                       OpenApiParameter('min_price', int, description='**حداقل قیمت**'),
-                       OpenApiParameter('max_price', int, description='**حداکثر قیمت**'),
-                       OpenApiParameter('sort',str, description='**مرتب سازی بر اساس آپشن ها**')
-                   ])
+    @extend_schema(
+        responses=GET_PRODUCTS_RESPONSE,
+        description='**برای فیلتر داینامیک**\n\n'
+                    ' - **/?key=value&key=value**\n'
+                    ' - **/?رنگ=blue&جنس=nakh**\n\n'
+                    '**برای مرتب سازی از این عبارات استفاده شده**\n\n'
+                    ' - **/?sort=oldest**\n'
+                    ' - **/?sort=price**\n'
+                    ' - **/?sort=-price**\n\n'
+                    '**نکته! جدیدترین محصول به صورت پیشفرض دیده میشود و نیاز به مرتب سازی ندارد**',
+        parameters=[
+            OpenApiParameter('search', str, description='**جستجو در نام و توضیحات**'),
+            OpenApiParameter('category', str, description='**فیلتر بر اساس دسته‌بندی**'),
+            OpenApiParameter('page', str, description='**رفتن به شماره صفحه**'),
+            OpenApiParameter('page_size', str, description='**تنظیم کردن سایز صفحه**'),
+            OpenApiParameter('رنگ', str, description='**فیلتر داینامیک(رنگ)**'),
+            OpenApiParameter('جنس', str, description='**فیلتر داینامیک(جنس)**'),
+            OpenApiParameter('min_price', int, description='**حداقل قیمت**'),
+            OpenApiParameter('max_price', int, description='**حداکثر قیمت**'),
+            OpenApiParameter('sort', str, description='**مرتب سازی بر اساس آپشن ها**'),
+        ],
+    )
     def list(self, request):
         queryset = self.get_queryset()
-        search = request.query_params.get("search")
-        category = request.query_params.get("category")
-        min_price = request.query_params.get("min_price")
-        max_price = request.query_params.get("max_price")
-        sort = request.query_params.get("sort")
+
+        search = request.query_params.get('search')
+        category = request.query_params.get('category')
+        min_price = request.query_params.get('min_price')
+        max_price = request.query_params.get('max_price')
+        sort = request.query_params.get('sort')
+
         if search:
-            queryset = queryset.filter(Q(name__icontains=search) |Q(description__icontains=search))
+            queryset = queryset.filter(
+                Q(name__icontains=search) | Q(description__icontains=search)
+            )
+
         if category:
             queryset = queryset.filter(category__name=category)
-        valid_attribute_keys = AttributeModel.objects.values_list('key', flat=True)
-        for key in valid_attribute_keys:
-            param_value = request.query_params.get(key)
-            if param_value:
-                queryset = queryset.filter(values__attribute__key=key,values__value__iexact=param_value)
+
+
+
         if min_price:
             queryset = queryset.filter(base_price__gte=min_price)
+
         if max_price:
             queryset = queryset.filter(base_price__lte=max_price)
+
         if sort:
             if sort == 'price':
                 queryset = queryset.order_by('base_price')
@@ -95,7 +110,22 @@ class ProductView(viewsets.ViewSet):
                 queryset = queryset.order_by('-base_price')
             elif sort == 'oldest':
                 queryset = queryset.order_by('id')
+
+        for key, values in self.request.query_params.lists():
+            if key in ["page", "page_size", "sort"]:
+                continue
+            attribute_query = Q()
+
+            for value in values:
+                attribute_query |= Q(
+                    product_attribute_values__attribute_value__attribute__key=key,
+                    product_attribute_values__attribute_value__value=value
+                )
+
+            queryset = queryset.filter(attribute_query)
+
         queryset = queryset.distinct()
+
         paginator = paginate()
         page = paginator.paginate_queryset(queryset, request)
         serializer = AllProductSerializer(page, many=True, context={'request': request})
@@ -269,14 +299,25 @@ class AttributeView(viewsets.ViewSet):
     http_method_names = ['get']
 
     def get_queryset(self):
-        return AttributeModel.objects.all().order_by('-id')
+        return AttributeModel.objects.prefetch_related('values').order_by('-id')
 
     @extend_schema(responses=GET_ATTRIBUTES_RESPONSE)
     def list(self, request):
-        attr = self.get_queryset().values_list('key','values__value').distinct()
+
+        attr_values = (
+            AttributeValueModel.objects
+            .select_related('attribute')
+            .values('attribute__key', 'value')
+            .distinct()
+            .order_by('attribute__key')
+        )
+
         data = {}
-        for key,values in attr:
-            data.setdefault(key,[]).append(values)
+        for item in attr_values:
+            key = item['attribute__key']
+            value = item['value']
+            data.setdefault(key, []).append(value)
+
         result = [{'key': key, 'values': values} for key, values in data.items()]
         return Response(result, status=status.HTTP_200_OK)
 
