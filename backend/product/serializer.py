@@ -169,10 +169,15 @@ class ProductSerializer(serializers.ModelSerializer):
                 })
 
             for val in values:
-                attr_value, _ = AttributeValueModel.objects.get_or_create(
-                    attribute=attribute,
-                    value=val,
-                )
+                try:
+                    attr_value, _ = AttributeValueModel.objects.get(
+                        attribute=attribute,
+                        value=val,
+                    )
+                except AttributeValueModel.DoesNotExist:
+                    raise serializers.ValidationError({
+                        'attribute_list': f'Attribute "{values}" does not exist.'
+                    })
                 result.append(attr_value)
 
         return result
