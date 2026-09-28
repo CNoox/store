@@ -95,8 +95,6 @@ class ProductView(viewsets.ViewSet):
         if category:
             queryset = queryset.filter(category__name=category)
 
-
-
         if min_price:
             queryset = queryset.filter(base_price__gte=min_price)
 
