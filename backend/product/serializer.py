@@ -9,7 +9,7 @@ from .models import (
     ProductModel,
     CategoryModel,
 )
-
+from django.conf import settings
 
 class JSONListField(serializers.ListField):
     def to_internal_value(self, data):
@@ -126,11 +126,22 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        if not self.instance and not attrs.get('images'):
+        images = attrs.get('images', [])
+
+        if not self.instance and not images:
             request = self.context.get('request')
             if not request or not request.FILES.getlist('images'):
                 raise serializers.ValidationError({
                     'images': 'At least one image is required.'
+                })
+        if len(images) >= settings.MAX_IMAGE_PER_PRODUCT + 1:
+            raise serializers.ValidationError({
+                'images': f'Maximum {settings.MAX_IMAGE_PER_PRODUCT} images are allowed.'
+            })
+        for image in images:
+            if image.size > settings.MAX_IMAGE_SIZE:
+                raise serializers.ValidationError({
+                    'images': f'Each image must not exceed {settings.MAX_IMAGE_SIZE_COUNT} MB.'
                 })
 
         base_price = attrs.get('base_price', getattr(self.instance, 'base_price', None))
@@ -240,6 +251,7 @@ class AllProductSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return [
             {
+                'id': img.pk,
                 'url': request.build_absolute_uri(img.image.url) if request else img.image.url,
                 'alt': obj.name,
             }
