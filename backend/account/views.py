@@ -2,7 +2,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.cache import cache
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .serializer import EmailSerializer,EmailOTPSerializer,UserSerializer,UserListSerializer
+from .serializer import EmailSerializer,EmailOTPSerializer,UserSerializer,UserListSerializer,IsactiveSerializer
 from rest_framework import status, viewsets
 from .tasks import update_last_login_task
 from .models import UserModel
@@ -115,6 +115,9 @@ class UserListView(viewsets.ViewSet):
         page = paginator.paginate_queryset(queryset, request)
         serializer = UserListSerializer(instance=page, many=True)
         return Response(serializer.data,status=status.HTTP_200_OK)
+    @extend_schema(
+        request=IsactiveSerializer,
+    )
     def partial_update(self, request, pk=None):
         queryset = self.queryset.filter(pk=pk).first()
         if not queryset:

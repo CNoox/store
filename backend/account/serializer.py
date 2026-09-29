@@ -31,17 +31,20 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 class UserListSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
-    first_name = ProfileSerializer(source='profile.first_name',read_only=True)
-    last_name = ProfileSerializer(source='profile.last_name',read_only=True)
-    avatar = ProfileSerializer(source='profile.avatar.url',read_only=True)
+    first_name = serializers.CharField(source='profile.first_name',read_only=True)
+    last_name = serializers.CharField(source='profile.last_name',read_only=True)
+    avatar = serializers.CharField(source='profile.avatar.url',read_only=True)
     created_at = serializers.SerializerMethodField(source='created_at',read_only=True)
     last_login = serializers.SerializerMethodField(source='last_login',read_only=True)
+    is_active = serializers.BooleanField()
     class Meta:
         model = UserModel
-        fields = ['id', 'email', 'phone_number',
-                  'is_superuser', 'first_name',
-                  'last_name', 'avatar',
-                  'created_at', 'last_login']
+        fields = ['id','first_name',
+                  'last_name', 'email',
+                  'phone_number', 'avatar',
+                  'is_active', 'is_superuser',
+                  'created_at', 'last_login'
+                  ]
 
     def get_created_at(self, obj):
         iran_time = obj.created_at.astimezone(ZoneInfo('Asia/Tehran'))
@@ -56,10 +59,12 @@ class UserListSerializer(serializers.ModelSerializer):
         ).strftime('%Y/%m/%d %H:%M:%S')
 
     def update(self, instance, validated_data):
-        is_active = validated_data.get('is_active')
-        instance.is_active = is_active
+        instance.is_active = validated_data.get('is_active', instance.is_active)
         instance.save()
         return instance
+
+class IsactiveSerializer(serializers.Serializer):
+    is_active = serializers.BooleanField()
 
 #=========================== SCHEMA ===========================
 
