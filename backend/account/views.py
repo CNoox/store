@@ -121,7 +121,7 @@ class UserListView(viewsets.ViewSet):
         serializer = UserListSerializer(instance=page, many=True)
         return paginator.get_paginated_response(serializer.data)
     @extend_schema(
-        request=IsactiveSerializer,description='نکته! نمیشه ادمین سایت یه ادمین دیگه یا خودشو بن کنه'
+        request=IsactiveSerializer,description='**نکته! نمیشه ادمین سایت یه ادمین دیگه یا خودشو بن کنه**'
     )
     def partial_update(self, request, pk=None):
         if request.user.id == pk:
