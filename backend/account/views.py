@@ -2,8 +2,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.cache import cache
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .serializer import EmailSerializer,EmailOTPSerializer,UserSerializer
-from rest_framework import status
+from .serializer import EmailSerializer,EmailOTPSerializer,UserSerializer,UserListSerializer
+from rest_framework import status, viewsets
 from .tasks import update_last_login_task
 from .models import UserModel
 from drf_spectacular.utils import extend_schema
@@ -13,6 +13,10 @@ from datetime import timedelta
 from .features.send_otp import send_otp
 from account.core.exceptions import Throttled, ValidationError, PermissionDenied
 from .utils import create_token
+from permission import IsSuperUser
+from paginator import paginate
+from django.db.models import Q
+from rest_framework.exceptions import NotFound
 
 # Create your views here.
 
@@ -78,8 +82,6 @@ class VerifyOTPView(APIView):
                     serializer = UserSerializer(instance=user)
                     return Response({'data': {'user': serializer.data}, 'token': token}, status=status.HTTP_200_OK)
                 user = UserModel.objects.create_user(email=email)
-                if user.is_active == False:
-                    raise PermissionDenied('User is banned.')
                 update_last_login_task.delay(pk=user.pk)
                 token = create_token(user=user)
                 serializer = UserSerializer(instance=user)
@@ -100,3 +102,24 @@ class LogoutView(APIView):
         return Response({'message': 'User logged out.'}, status=status.HTTP_200_OK)
 
 
+class UserListView(viewsets.ViewSet):
+    permission_classes = [IsSuperUser]
+    http_method_names = ['get', 'patch']
+    queryset = UserModel.objects.all().order_by('id')
+    def list(self, request):
+        search = request.query_params.get('search')
+        queryset = self.queryset
+        if search:
+            queryset = queryset(Q(phone_number__icontains=search) | Q(email__icontains=search))
+        paginator = paginate()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = UserListSerializer(instance=page, many=True)
+        return Response(serializer.data,status=status.HTTP_200_OK)
+    def partial_update(self, request, pk=None):
+        queryset = self.queryset.filter(pk=pk).first()
+        if not queryset:
+            raise NotFound('User not found.')
+        serializer = UserListSerializer(instance=queryset,data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data,status=status.HTTP_200_OK)

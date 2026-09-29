@@ -46,3 +46,13 @@ class UserTokenModel(models.Model):
     expires_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
+def profile_image_upload_to(instance, filename):
+    return f'profile/{instance.user.id}/{filename}'
+class ProfileModel(models.Model):
+    user = models.OneToOneField(UserModel, on_delete=models.CASCADE, primary_key=True, related_name='profile')
+    first_name = models.CharField(max_length=255)
+    last_name = models.CharField(max_length=255)
+    avatar = models.ImageField(upload_to=profile_image_upload_to,null=True, blank=True)
+
+    def __str__(self):
+        return f'{self.first_name} {self.last_name}'

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import LoginEmailOTPView, VerifyOTPView, LogoutView
+from .views import LoginEmailOTPView, VerifyOTPView, LogoutView, UserListView
 
 app_name = 'account'
 
@@ -7,4 +7,6 @@ urlpatterns = [
     path('login/', LoginEmailOTPView.as_view(), name='login'),
     path('otp/', VerifyOTPView.as_view(), name='otp'),
     path('logout/',LogoutView.as_view(), name='logout'),
+    path('users/', UserListView.as_view({'get':'list'}), name='show-user-list'),
+    path('users/<int:pk>/', UserListView.as_view({'patch':'partial_update'}), name='update-user-list'),
 ]
