@@ -6,7 +6,7 @@ from .serializer import EmailSerializer,EmailOTPSerializer,UserSerializer,UserLi
 from rest_framework import status, viewsets
 from .tasks import update_last_login_task
 from .models import UserModel
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from .schemas.response import LOGIN_OTP_RESPONSES, VERIFY_OTP_RESPONSES, LOGOUT_RESPONSES
 from django.utils import timezone
 from datetime import timedelta
@@ -106,20 +106,29 @@ class UserListView(viewsets.ViewSet):
     permission_classes = [IsSuperUser]
     http_method_names = ['get', 'patch']
     queryset = UserModel.objects.all().order_by('id')
+    @extend_schema(
+        parameters=[
+            OpenApiParameter('search', str, description='**جستجو در نام و ایمیل و شماره تماس**'),
+        ],
+    )
     def list(self, request):
         search = request.query_params.get('search')
         queryset = self.queryset
         if search:
-            queryset = queryset(Q(phone_number__icontains=search) | Q(email__icontains=search))
+            queryset = queryset.filter(Q(phone_number__icontains=search) | Q(email__icontains=search) | Q(profile__first_name__icontains=search) | Q(profile__last_name__icontains=search))
         paginator = paginate()
         page = paginator.paginate_queryset(queryset, request)
         serializer = UserListSerializer(instance=page, many=True)
-        return Response(serializer.data,status=status.HTTP_200_OK)
+        return paginator.get_paginated_response(serializer.data)
     @extend_schema(
-        request=IsactiveSerializer,
+        request=IsactiveSerializer,description='نکته! نمیشه ادمین سایت یه ادمین دیگه یا خودشو بن کنه'
     )
     def partial_update(self, request, pk=None):
+        if request.user.id == pk:
+            raise PermissionDenied('You can\'t edit yourself.')
         queryset = self.queryset.filter(pk=pk).first()
+        if queryset.is_superuser == True:
+            raise PermissionDenied('You can\'t edit superuser members.')
         if not queryset:
             raise NotFound('User not found.')
         serializer = UserListSerializer(instance=queryset,data=request.data, partial=True)
