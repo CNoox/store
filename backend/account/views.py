@@ -105,10 +105,12 @@ class LogoutView(APIView):
 class UserListView(viewsets.ViewSet):
     permission_classes = [IsSuperUser]
     http_method_names = ['get', 'patch']
-    queryset = UserModel.objects.all().order_by('id')
+    queryset = UserModel.objects.all().order_by('id').select_related('profile')
     @extend_schema(
         parameters=[
             OpenApiParameter('search', str, description='**جستجو در نام و ایمیل و شماره تماس**'),
+            OpenApiParameter('page', str, description='**رفتن به شماره صفحه**'),
+            OpenApiParameter('page_size', str, description='**تنظیم کردن سایز صفحه**'),
         ],
     )
     def list(self, request):

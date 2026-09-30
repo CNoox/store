@@ -24,6 +24,3 @@ resend
 # Bucket S3
 django-storages[s3]
 boto3
-
-# translate miladi date to shamsi
-jdatetime

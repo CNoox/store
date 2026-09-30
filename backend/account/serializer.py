@@ -33,9 +33,7 @@ class UserListSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
     first_name = serializers.CharField(source='profile.first_name',read_only=True)
     last_name = serializers.CharField(source='profile.last_name',read_only=True)
-    avatar = serializers.CharField(source='profile.avatar.url',read_only=True)
-    created_at = serializers.SerializerMethodField(source='created_at',read_only=True)
-    last_login = serializers.SerializerMethodField(source='last_login',read_only=True)
+    avatar = serializers.SerializerMethodField(source='profile.avatar.url',read_only=True)
     is_active = serializers.BooleanField()
     class Meta:
         model = UserModel
@@ -43,21 +41,17 @@ class UserListSerializer(serializers.ModelSerializer):
                   'last_name', 'email',
                   'phone_number', 'avatar',
                   'is_active', 'is_superuser',
-                  'created_at', 'last_login'
+                  'created_at', 'last_login',
+                  'updated_at'
                   ]
 
-    def get_created_at(self, obj):
-        iran_time = obj.created_at.astimezone(ZoneInfo('Asia/Tehran'))
-        return jdatetime.datetime.fromgregorian(
-            datetime=iran_time
-        ).strftime('%Y/%m/%d %H:%M:%S')
+    def get_avatar(self, obj):
+        profile = getattr(obj, 'profile', None)
 
-    def get_last_login(self, obj):
-        iran_time = obj.last_login.astimezone(ZoneInfo('Asia/Tehran'))
-        return jdatetime.datetime.fromgregorian(
-            datetime=iran_time
-        ).strftime('%Y/%m/%d %H:%M:%S')
+        if not profile or not profile.avatar:
+            return None
 
+        return profile.avatar.url
     def update(self, instance, validated_data):
         instance.is_active = validated_data.get('is_active', instance.is_active)
         instance.save()

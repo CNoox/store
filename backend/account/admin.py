@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import Group
 from unfold.admin import ModelAdmin
-from .models import UserModel, UserTokenModel
+from .models import UserModel, UserTokenModel, ProfileModel
 from django_celery_beat.models import (
     PeriodicTask,
     IntervalSchedule,
@@ -30,3 +30,17 @@ class UserModelAdmin(ModelAdmin):
 class UserTokenModelAdmin(ModelAdmin):
     list_display = ('user','token','created_at','expires_at','is_active')
     search_fields = ('user','token')
+
+
+@admin.register(ProfileModel)
+class ProfileModelAdmin(ModelAdmin):
+    list_display = ('user','email','phone_number','is_active')
+    search_fields = ('user','email')
+
+    def email(self, obj):
+        return obj.user.email
+    def phone_number(self, obj):
+        return obj.user.phone_number
+
+    def is_active(self, obj):
+        return obj.user.is_active
