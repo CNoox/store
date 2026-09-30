@@ -1,7 +1,5 @@
 from rest_framework import serializers
 from .models import UserModel,ProfileModel
-import jdatetime
-from zoneinfo import ZoneInfo
 
 
 class EmailSerializer(serializers.Serializer):
