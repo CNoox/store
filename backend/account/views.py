@@ -62,8 +62,10 @@ class VerifyOTPView(APIView):
         email = serializer.validated_data['email']
         code = serializer.validated_data['otp']
         # DEMO
-        if email == 'admin@example.com' and code == '123456':
+        if email in ('admin@example.com','ban@example.com') and code == '123456':
             user = UserModel.objects.get(email=email)
+            if user.is_active == False:
+                raise PermissionDenied('User is banned.')
             token = create_token(user=user)
             serializer = UserSerializer(instance=user)
             return Response({'data': {'user': serializer.data}, 'token': token}, status=status.HTTP_200_OK)
