@@ -15,7 +15,8 @@ from account.core.exceptions import Throttled, ValidationError, PermissionDenied
 from .utils import create_token
 from permission import IsSuperUser
 from paginator import paginate
-from django.db.models import Q
+from django.db.models import Q, Value
+from django.db.models.functions import Concat
 from rest_framework.exceptions import NotFound
 
 # Create your views here.
@@ -119,7 +120,19 @@ class UserListView(viewsets.ViewSet):
         search = request.query_params.get('search')
         queryset = self.queryset
         if search:
-            queryset = queryset.filter(Q(phone_number__icontains=search) | Q(email__icontains=search) | Q(profile__first_name__icontains=search) | Q(profile__last_name__icontains=search))
+            queryset = queryset.annotate(
+                full_name=Concat(
+                    'profile__first_name',
+                    Value(' '),
+                    'profile__last_name'
+                )
+            ).filter(
+                Q(phone_number__icontains=search) |
+                Q(email__icontains=search) |
+                Q(profile__first_name__icontains=search) |
+                Q(profile__last_name__icontains=search) |
+                Q(full_name=search)
+            )
         paginator = paginate()
         page = paginator.paginate_queryset(queryset, request)
         serializer = UserListSerializer(instance=page, many=True)
