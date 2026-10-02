@@ -96,7 +96,7 @@ class VerifyOTPView(APIView):
                 return Response({'data': {'user': serializer.data}, 'token': token}, status=status.HTTP_201_CREATED)
             raise ValidationError('OTP code verification failed.')
         except (TypeError, KeyError) as e:
-            raise ValidationError(f'{e}')
+            raise ValidationError('OTP code verification failed.')
 
 class LogoutView(APIView):
     http_method_names = ['post']

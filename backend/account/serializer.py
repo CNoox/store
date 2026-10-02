@@ -13,7 +13,6 @@ class EmailOTPSerializer(serializers.Serializer):
     otp = serializers.CharField(max_length=6)
     def validate_otp(self, otp):
         try:
-            otp_2 = int(otp)
             if len(otp) == 6:
                 return otp
             raise serializers.ValidationError('OTP must be 6 digits.')
@@ -100,9 +99,11 @@ class ProfleUserSerializer(serializers.ModelSerializer):
         return avatar
 
     def validate_phone_number(self, phone_number):
-       if re.fullmatch(r'(09\d{9}|9\d{9})', phone_number):
-           return phone_number
-       raise serializers.ValidationError('Invalid phone number. It must start with `09` and contain 11 digits, or start with `9` and contain 10 digits.')
+        if re.fullmatch(r'(9\d{9})', phone_number):
+            return phone_number
+        if re.fullmatch(r'(09\d{9})', phone_number):
+            return phone_number[1:]
+        raise serializers.ValidationError('Invalid phone number. It must start with `09` and contain 11 digits, or start with `9` and contain 10 digits.')
 
     def validate_first_name(self, first_name):
         if re.fullmatch(r'^[آ-ی]+$', first_name):
