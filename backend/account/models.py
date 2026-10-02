@@ -22,7 +22,7 @@ class UserModel(AbstractBaseUser, PermissionsMixin):
         id = models.AutoField(primary_key=True)
         email = models.EmailField(max_length=255, unique=True)
         password = models.CharField(max_length=255, blank=True, null=True)
-        phone_number = models.CharField(max_length=255, blank=True, null=True)
+        phone_number = models.CharField(max_length=255, blank=True, null=True, unique=True)
         is_active = models.BooleanField(default=True)
         is_staff = models.BooleanField(default=False)
         is_superuser = models.BooleanField(default=False)

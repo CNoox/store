@@ -1,3 +1,5 @@
+import re
+
 from rest_framework import serializers
 from .models import UserModel,ProfileModel
 
@@ -29,9 +31,9 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 class UserListSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
-    first_name = serializers.CharField(source='profile.first_name',read_only=True)
-    last_name = serializers.CharField(source='profile.last_name',read_only=True)
-    avatar = serializers.SerializerMethodField(source='profile.avatar.url',read_only=True)
+    first_name = serializers.CharField(source='profile.first_name')
+    last_name = serializers.CharField(source='profile.last_name')
+    avatar = serializers.SerializerMethodField()
     is_active = serializers.BooleanField()
     class Meta:
         model = UserModel
@@ -57,6 +59,52 @@ class UserListSerializer(serializers.ModelSerializer):
 
 class IsactiveSerializer(serializers.Serializer):
     is_active = serializers.BooleanField()
+
+class ProfleUserSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(read_only=True)
+    first_name = serializers.CharField(source='profile.first_name')
+    last_name = serializers.CharField(source='profile.last_name')
+    avatar = serializers.ImageField(source='profile.avatar', required=False)
+    class Meta:
+        model = UserModel
+        fields = ['id','first_name',
+                  'last_name', 'email',
+                  'phone_number', 'avatar',
+                  'created_at','last_login',
+                  'updated_at'
+                  ]
+
+    def validate_avatar(self, image):
+        if image.size > 2 * 1024 * 1024:
+            raise serializers.ValidationError('Image size must not exceed 2MB.')
+
+        return image
+
+    def update(self, instance, validated_data):
+        profile_data = validated_data.pop('profile', {})
+        instance.phone_number = validated_data.get('phone_number', instance.phone_number)
+        profile = instance.profile
+        profile.first_name = profile_data.get('first_name', profile.first_name)
+        profile.last_name = profile_data.get('last_name', profile.last_name)
+        profile.avatar = profile_data.get('avatar', profile.avatar)
+        instance.save()
+        instance.profile.save()
+        return instance
+
+    def validate_phone_number(self, phone_number):
+       if re.fullmatch(r'(09\d{9}|9\d{9})', phone_number):
+           return phone_number
+       raise serializers.ValidationError('Invalid phone number. It must start with `09` and contain 11 digits, or start with `9` and contain 10 digits.')
+
+    def validate_first_name(self, first_name):
+        if re.fullmatch(r'^[آ-ی]+$', first_name):
+            return first_name
+        raise serializers.ValidationError('Invalid first name. It must contain only Persian letters.')
+
+    def validate_last_name(self, last_name):
+        if re.fullmatch(r'^[آ-ی]+$', last_name):
+            return last_name
+        raise serializers.ValidationError('Invalid last name. It must contain only Persian letters.')
 
 #=========================== SCHEMA ===========================
 

@@ -1,8 +1,12 @@
+import requests
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.cache import cache
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .serializer import EmailSerializer,EmailOTPSerializer,UserSerializer,UserListSerializer,IsactiveSerializer
+from .serializer import (EmailSerializer, EmailOTPSerializer,
+                         UserSerializer, UserListSerializer,
+                         IsactiveSerializer, ProfleUserSerializer
+                         )
 from rest_framework import status, viewsets
 from .tasks import update_last_login_task
 from .models import UserModel
@@ -18,6 +22,7 @@ from paginator import paginate
 from django.db.models import Q, Value
 from django.db.models.functions import Concat
 from rest_framework.exceptions import NotFound
+from rest_framework.parsers import MultiPartParser, FormParser
 
 # Create your views here.
 
@@ -149,6 +154,26 @@ class UserListView(viewsets.ViewSet):
         if not queryset:
             raise NotFound('User not found.')
         serializer = UserListSerializer(instance=queryset,data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data,status=status.HTTP_200_OK)
+
+
+@extend_schema(tags=['Profile'])
+class ProfileView(viewsets.ViewSet):
+    http_method_names = ['get', 'patch']
+    permission_classes = [IsAuthenticated]
+    queryset = UserModel.objects.all().order_by('id').select_related('profile')
+    def list(self, request):
+        user_id = request.user.id
+        queryset = self.queryset.filter(pk=user_id).first()
+        serializer = ProfleUserSerializer(instance=queryset)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def partial_update(self, request):
+        user_id = request.user.id
+        queryset = self.queryset.filter(pk=user_id).first()
+        serializer = ProfleUserSerializer(instance=queryset, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data,status=status.HTTP_200_OK)
