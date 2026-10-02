@@ -2,6 +2,7 @@ import re
 
 from rest_framework import serializers
 from .models import UserModel,ProfileModel
+from django.conf import settings
 
 
 class EmailSerializer(serializers.Serializer):
@@ -74,12 +75,6 @@ class ProfleUserSerializer(serializers.ModelSerializer):
                   'updated_at'
                   ]
 
-    def validate_avatar(self, image):
-        if image.size > 2 * 1024 * 1024:
-            raise serializers.ValidationError('Image size must not exceed 2MB.')
-
-        return image
-
     def update(self, instance, validated_data):
         profile_data = validated_data.pop('profile', {})
         instance.phone_number = validated_data.get('phone_number', instance.phone_number)
@@ -90,6 +85,15 @@ class ProfleUserSerializer(serializers.ModelSerializer):
         instance.save()
         instance.profile.save()
         return instance
+
+    def validate_avatar(self, avatar):
+        image = self.initial_data.getlist('avatar')
+        if len(image) > 1:
+            raise serializers.ValidationError('Only one image can be uploaded.')
+        if avatar.size > settings.MAX_IMAGE_SIZE:
+            raise serializers.ValidationError(f'Image size must not exceed {settings.MAX_IMAGE_SIZE_COUNT}MB.')
+
+        return avatar
 
     def validate_phone_number(self, phone_number):
        if re.fullmatch(r'(09\d{9}|9\d{9})', phone_number):
