@@ -65,7 +65,11 @@ class ProfleUserSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
     first_name = serializers.CharField(source='profile.first_name')
     last_name = serializers.CharField(source='profile.last_name')
+    email = serializers.EmailField(read_only=True)
     avatar = serializers.ImageField(source='profile.avatar', required=False)
+    last_login = serializers.DateTimeField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
     class Meta:
         model = UserModel
         fields = ['id','first_name',

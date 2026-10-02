@@ -164,12 +164,15 @@ class ProfileView(viewsets.ViewSet):
     http_method_names = ['get', 'patch']
     permission_classes = [IsAuthenticated]
     queryset = UserModel.objects.all().order_by('id').select_related('profile')
+
+    @extend_schema(responses={200: ProfleUserSerializer})
     def list(self, request):
         user_id = request.user.id
         queryset = self.queryset.filter(pk=user_id).first()
         serializer = ProfleUserSerializer(instance=queryset)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=ProfleUserSerializer, responses={200: ProfleUserSerializer})
     def partial_update(self, request):
         user_id = request.user.id
         queryset = self.queryset.filter(pk=user_id).first()
