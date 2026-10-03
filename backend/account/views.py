@@ -9,7 +9,7 @@ from .serializer import (EmailSerializer, EmailOTPSerializer,
                          )
 from rest_framework import status, viewsets
 from .tasks import update_last_login_task
-from .models import UserModel
+from .models import UserModel, ProfileModel
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from .schemas.response import LOGIN_OTP_RESPONSES, VERIFY_OTP_RESPONSES, LOGOUT_RESPONSES
 from django.utils import timezone
@@ -85,11 +85,13 @@ class VerifyOTPView(APIView):
                     user = UserModel.objects.get(email=email)
                     if user.is_active == False:
                         raise PermissionDenied('User is banned.')
+                    ProfileModel.objects.get_or_create(user=user)
                     update_last_login_task.delay(pk=user.pk)
                     token = create_token(user=user)
                     serializer = UserSerializer(instance=user)
                     return Response({'data': {'user': serializer.data}, 'token': token}, status=status.HTTP_200_OK)
                 user = UserModel.objects.create_user(email=email)
+                ProfileModel.objects.get_or_create(user=user)
                 update_last_login_task.delay(pk=user.pk)
                 token = create_token(user=user)
                 serializer = UserSerializer(instance=user)
