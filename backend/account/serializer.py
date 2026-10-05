@@ -95,7 +95,6 @@ class ProfleUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Only one image can be uploaded.')
         if avatar.size > settings.MAX_IMAGE_SIZE:
             raise serializers.ValidationError(f'Image size must not exceed {settings.MAX_IMAGE_SIZE_COUNT}MB.')
-
         return avatar
 
     def validate_phone_number(self, phone_number):
@@ -106,14 +105,18 @@ class ProfleUserSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError('Invalid phone number. It must start with `09` and contain 11 digits, or start with `9` and contain 10 digits.')
 
     def validate_first_name(self, first_name):
-        if re.fullmatch(r'^[آ-ی]+$', first_name):
+        if not len(first_name) > 4 and not len(first_name) < 32:
+            raise serializers.ValidationError('First name must be 4 digits and maximum length is 32 characters.')
+        if re.fullmatch(r'^(?:[آ-ی]+|[a-z]+)$', first_name):
             return first_name
-        raise serializers.ValidationError('Invalid first name. It must contain only Persian letters.')
+        raise serializers.ValidationError('Invalid first name. It must contain only letter.')
 
     def validate_last_name(self, last_name):
-        if re.fullmatch(r'^[آ-ی]+$', last_name):
+        if not len(last_name) > 4 and not len(last_name) < 32:
+            raise serializers.ValidationError('Last name must be 4 digits and maximum length is 32 characters.')
+        if re.fullmatch(r'^(?:[آ-ی]+|[a-z]+)$', last_name):
             return last_name
-        raise serializers.ValidationError('Invalid last name. It must contain only Persian letters.')
+        raise serializers.ValidationError('Invalid last name. It must contain only letter.')
 
 #=========================== SCHEMA ===========================
 

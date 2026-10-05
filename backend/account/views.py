@@ -5,7 +5,7 @@ from django.core.cache import cache
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .serializer import (EmailSerializer, EmailOTPSerializer,
                          UserSerializer, UserListSerializer,
-                         IsactiveSerializer, ProfleUserSerializer
+                         IsactiveSerializer, ProfleUserSerializer, SCHMessageSerializer, SCHErrorResponseSerializer
                          )
 from rest_framework import status, viewsets
 from .tasks import update_last_login_task
@@ -182,3 +182,15 @@ class ProfileView(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data,status=status.HTTP_200_OK)
+
+@extend_schema(tags=['Profile'],description='***برای حذف عکس پروفایل***')
+class DeleteAvatarView(APIView):
+    http_method_names = ['delete']
+    permission_classes = [IsAuthenticated]
+    queryset = UserModel.objects.all().order_by('id').select_related('profile')
+    @extend_schema(responses={200: SCHMessageSerializer})
+    def delete(self, request):
+        user_id = request.user.id
+        queryset = self.queryset.filter(pk=user_id).first()
+        queryset.profile.avatar.delete()
+        return Response({'message':'Avatar was deleted.'}, status=status.HTTP_200_OK)
