@@ -161,7 +161,7 @@ class UserListView(viewsets.ViewSet):
         return Response(serializer.data,status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['Profile'])
+@extend_schema(tags=['profile'])
 class ProfileView(viewsets.ViewSet):
     http_method_names = ['get', 'patch']
     permission_classes = [IsAuthenticated]
@@ -183,7 +183,7 @@ class ProfileView(viewsets.ViewSet):
         serializer.save()
         return Response(serializer.data,status=status.HTTP_200_OK)
 
-@extend_schema(tags=['Profile'],description='***برای حذف عکس پروفایل***')
+@extend_schema(tags=['profile'],description='***برای حذف عکس پروفایل***')
 class DeleteAvatarView(APIView):
     http_method_names = ['delete']
     permission_classes = [IsAuthenticated]
