@@ -42,7 +42,8 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     'account.apps.AccountConfig',
-    'product.apps.ProductConfig'
+    'product.apps.ProductConfig',
+    'order.apps.OrderConfig',
 ]
 
 # Application definition
